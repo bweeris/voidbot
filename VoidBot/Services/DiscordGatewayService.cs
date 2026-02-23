@@ -15,6 +15,8 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
     private DiscordSocketClient? _client;
     private InteractionService? _interactionService;
 
+    private static object _lock = new();
+
     private readonly List<IMessage> _toDelete = new();
     private Timer _timer;
 
