@@ -3,6 +3,7 @@
 using CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using VoidBot.Services;
 
 await Parser.Default.ParseArguments<Options>(args)
@@ -20,8 +21,11 @@ await Parser.Default.ParseArguments<Options>(args)
     {
         var builder = Host.CreateApplicationBuilder(args);
 
+        builder.Logging.AddConsole();
+
         builder.Services.Configure<Options>(o =>
         {
+            o.GuildId = options.GuildId;
             o.ChannelId = options.ChannelId;
             o.Token = options.Token;
             o.Ttl = options.Ttl;

@@ -42,7 +42,7 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
 
         var config = new DiscordSocketConfig
         {
-            GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent,
+            GatewayIntents = GatewayIntents.AutoModerationActionExecution | GatewayIntents.GuildMessages | GatewayIntents.Guilds,
         };
 
         _client = new DiscordSocketClient(config);
@@ -79,12 +79,18 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
 
     private async Task OnClientReadyAsync()
     {
+        _logger.LogInformation("Get channel {ChannelId}", _options.ChannelId);
+
         // Grab all messages in the target channel and delete them if they are older than the TTL, or create deletion tasks otherwise
         var channel = await _client.GetChannelAsync(_options.ChannelId);
-        if (channel is not SocketTextChannel textChannel)
+        _logger.LogInformation("Connected to channel: {Channel}, type: {ChannelType}", channel.Id, channel.GetType().Name);
+
+        if (channel is not ITextChannel textChannel)
         {
             return;
         }
+
+        _logger.LogInformation("Get current messages");
 
         var startupTime = DateTimeOffset.UtcNow;
         var messages = textChannel.GetMessagesAsync();
@@ -156,7 +162,7 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
             return;
         }
 
-        if (socketMessage.Channel is not SocketGuildChannel guildChannel)
+        if (socketMessage.Channel is not ITextChannel guildChannel)
         {
             return;
         }
@@ -170,6 +176,7 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
         _ = Task.Run(async () =>
         {
             await Task.Delay(_options.TimeToLive);
+            _logger.LogInformation("Deleting message: {MessageIdl}", socketMessage.Id);
             await socketMessage.DeleteAsync();
         });
     }
