@@ -39,10 +39,10 @@ public class Options
     public string Token { get; set; }
 
     [Option('g', "guild", Required = true, HelpText = "The guild ID to connect to.")]
-    public uint GuildId { get; set; }
+    public ulong GuildId { get; set; }
 
     [Option('c', "channel", Required = true, HelpText = "The channel ID to connect to.")]
-    public uint ChannelId { get; set; }
+    public ulong ChannelId { get; set; }
 
     [Option('t', "ttl", Required = false, HelpText = "The time to live before messages in the channel are deleted.")]
     public string Ttl { get; set; } = "1m";
