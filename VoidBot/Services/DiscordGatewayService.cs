@@ -68,18 +68,28 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
             return;
         }
 
-        var toDelete = _toDelete.ToArray();
-        _toDelete.Clear();
+        IMessage[] toDelete;
+        lock (_lock)
+        {
+            toDelete = _toDelete.ToArray();
+            _toDelete.Clear();
+        }
 
         var channel = await _client.GetChannelAsync(_options.ChannelId);
         if (channel is not ITextChannel textChannel)
         {
             return;
         }
-        
-        await textChannel.DeleteMessagesAsync(toDelete);
-    }
 
+        try
+        {
+            await textChannel.DeleteMessagesAsync(toDelete);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to delete messages");
+        }
+    }
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         if (_client is null)
