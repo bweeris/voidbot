@@ -29,6 +29,7 @@ await Parser.Default.ParseArguments<Options>(args)
             o.ChannelId = options.ChannelId;
             o.Token = options.Token;
             o.Ttl = options.Ttl;
+            o.KeepMessages = options.KeepMessages;
         });
         
         builder.Services.AddHostedService<DiscordGatewayService>();
@@ -47,6 +48,9 @@ public class Options
 
     [Option('c', "channel", Required = true, HelpText = "The channel ID to connect to.")]
     public ulong ChannelId { get; set; }
+
+    [Option('k', "keep-messages", Required = false, HelpText = "Message IDs not to delete.", Default = new ulong[0])]
+    public ulong[] KeepMessages { get; set; } = Array.Empty<ulong>();
 
     [Option('t', "ttl", Required = false, HelpText = "The time to live before messages in the channel are deleted.")]
     public string Ttl { get; set; } = "1m";

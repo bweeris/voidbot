@@ -15,6 +15,9 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
     private DiscordSocketClient? _client;
     private InteractionService? _interactionService;
 
+    private readonly List<IMessage> _toDelete = new();
+    private Timer _timer;
+
     public DiscordGatewayService(
         IOptions<Options> options,
         ILogger<DiscordGatewayService> logger
@@ -52,10 +55,29 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
         _client.MessageReceived += OnMessageReceivedAsync;
         _client.Ready += OnClientReadyAsync;
 
-
+        _timer = new Timer(OnTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
 
         await _client.LoginAsync(TokenType.Bot, _options.Token);
         await _client.StartAsync();
+    }
+
+    private async void OnTick(object? state)
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        var toDelete = _toDelete.ToArray();
+        _toDelete.Clear();
+
+        var channel = await _client.GetChannelAsync(_options.ChannelId);
+        if (channel is not ITextChannel textChannel)
+        {
+            return;
+        }
+        
+        await textChannel.DeleteMessagesAsync(toDelete);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -72,6 +94,8 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
         {
             _interactionService.Log -= OnDiscordLogAsync;
         }
+
+        await _timer.DisposeAsync();
 
         await _client.StopAsync();
         await _client.LogoutAsync();
@@ -102,6 +126,9 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
                 {
                     break;
                 }
+                if(_options.KeepMessages?.Contains(message.Id) ?? false) {
+                    continue;
+                }
                 if (message.CreatedAt < startupTime - _options.TimeToLive)
                 {
                     await message.DeleteAsync();
@@ -116,7 +143,7 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
                         {
                             await Task.Delay(delay);
                         }
-                        await message.DeleteAsync();
+                        _toDelete.Add(message);
                     });
                 }
             }
@@ -177,7 +204,7 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
         {
             await Task.Delay(_options.TimeToLive);
             _logger.LogInformation("Deleting message: {MessageIdl}", socketMessage.Id);
-            await socketMessage.DeleteAsync();
+            _toDelete.Add(socketMessage);
         });
     }
 
