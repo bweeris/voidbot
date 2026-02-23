@@ -1,4 +1,4 @@
-﻿using Discord;
+using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.Hosting;
@@ -14,11 +14,6 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
 
     private DiscordSocketClient? _client;
     private InteractionService? _interactionService;
-
-    private static object _lock = new();
-
-    private readonly List<IMessage> _toDelete = new();
-    private Timer _timer;
 
     public DiscordGatewayService(
         IOptions<Options> options,
@@ -57,41 +52,10 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
         _client.MessageReceived += OnMessageReceivedAsync;
         _client.Ready += OnClientReadyAsync;
 
-        _timer = new Timer(OnTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
-
         await _client.LoginAsync(TokenType.Bot, _options.Token);
         await _client.StartAsync();
     }
-
-    private async void OnTick(object? state)
-    {
-        if (_client is null)
-        {
-            return;
-        }
-
-        IMessage[] toDelete;
-        lock (_lock)
-        {
-            toDelete = _toDelete.ToArray();
-            _toDelete.Clear();
-        }
-
-        var channel = await _client.GetChannelAsync(_options.ChannelId);
-        if (channel is not ITextChannel textChannel)
-        {
-            return;
-        }
-
-        try
-        {
-            await textChannel.DeleteMessagesAsync(toDelete);
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Failed to delete messages");
-        }
-    }
+    
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         if (_client is null)
@@ -106,8 +70,6 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
         {
             _interactionService.Log -= OnDiscordLogAsync;
         }
-
-        await _timer.DisposeAsync();
 
         await _client.StopAsync();
         await _client.LogoutAsync();
@@ -155,10 +117,33 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
                         {
                             await Task.Delay(delay);
                         }
-                        _toDelete.Add(message);
+                        MessageSpoolingService.ToDelete.Add(message);
                     });
                 }
             }
+        }
+    }
+
+    public async Task DeleteMessages(IEnumerable<IMessage> messages)
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        var channel = await _client.GetChannelAsync(_options.ChannelId);
+        if (channel is not ITextChannel textChannel)
+        {
+            return;
+        }
+
+        try
+        {
+            await textChannel.DeleteMessagesAsync(messages);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to delete messages");
         }
     }
 
@@ -216,7 +201,7 @@ public class DiscordGatewayService : IHostedService, IAsyncDisposable
         {
             await Task.Delay(_options.TimeToLive);
             _logger.LogInformation("Deleting message: {MessageIdl}", socketMessage.Id);
-            _toDelete.Add(socketMessage);
+            MessageSpoolingService.ToDelete.Add(socketMessage);
         });
     }
 

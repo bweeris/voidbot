@@ -32,7 +32,9 @@ await Parser.Default.ParseArguments<Options>(args)
             o.KeepMessages = options.KeepMessages;
         });
         
-        builder.Services.AddHostedService<DiscordGatewayService>();
+        builder.Services.AddSingleton<DiscordGatewayService>();
+        builder.Services.AddHostedService<DiscordGatewayService>(svc => svc.GetRequiredService<DiscordGatewayService>());
+        builder.Services.AddHostedService<MessageSpoolingService>();
 
         var host = builder.Build();
         await host.RunAsync();
